@@ -15,13 +15,15 @@ leagues_message = """
 """
 
 def get_league_input():
-    try:
-        num = int(input(leagues_message))
-        assert num in [1, 2, 3, 4, 5]
-        return num
-    except (ValueError, AssertionError):
-        print('Please enter a valid input!')
-        get_league_input()
+    while True:
+        try:
+            num = int(input(leagues_message))
+            if num in [1, 2, 3, 4, 5]:
+                return num
+            else:
+                print('Please enter a number between 1-5!')
+        except ValueError:
+            print('Please enter a valid number!')
 
 
 def run():
