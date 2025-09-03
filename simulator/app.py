@@ -1,4 +1,4 @@
-from simulator.league import League
+from .league import League
 
 welcome_message = """
 Welcome to the League Simulator!

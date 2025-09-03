@@ -1,7 +1,7 @@
 import pandas as pd
 
 from simulator.player import Player
-from manager import Manager
+from .manager import Manager
 
 df_players_data = pd.read_pickle("simulator/data/player_data")
 
