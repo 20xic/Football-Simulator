@@ -1,10 +1,6 @@
-import pandas as pd
-
 from simulator.player import Player
-from .manager import Manager
-
-df_players_data = pd.read_pickle("simulator/data/player_data")
-
+from simulator.manager import Manager
+from simulator.data_provider import DataProvider
 
 class Team:
     def __init__(self, team_name):
@@ -15,12 +11,16 @@ class Team:
         self.attack = 0
         self.midfield = 0
         self.defence = 0
+        self.overall = 0
+        
+        # Используем DataProvider для получения данных
+        self.data_provider = DataProvider()
         self.set_players()
         self.set_stats()
         self.set_squad()
 
     def set_players(self):
-        df_team_players_data = df_players_data[df_players_data["club"] == self.name]
+        df_team_players_data = self.data_provider.get_players_by_team(self.name)
         for index, df_player in df_team_players_data.iterrows():
             self.players[df_player["long_name"]] = Player(df_player)
 
@@ -37,45 +37,49 @@ class Team:
         self.goalkeepers = [
             player for player in self.players.values() if player.is_goalkeeper()
         ]
-        self.attack = sum(player.overall for player in self.attackers) // len(
-            self.attackers
-        )
-        self.defence = (
-            sum(player.overall for player in self.defenders)
-            + sum(player.overall for player in self.goalkeepers)
-        ) // (len(self.defenders) + len(self.goalkeepers))
-        self.midfield = sum(player.overall for player in self.midfielders) // len(
-            self.midfielders
-        )
+        
+        # Более точный расчет рейтингов команды
+        if self.attackers:
+            self.attack = sum(player.overall for player in self.attackers) // len(self.attackers)
+        else:
+            self.attack = 50  # Значение по умолчанию
+            
+        if self.defenders and self.goalkeepers:
+            defence_total = (sum(player.overall for player in self.defenders) + 
+                           sum(player.overall for player in self.goalkeepers))
+            self.defence = defence_total // (len(self.defenders) + len(self.goalkeepers))
+        else:
+            self.defence = 50  # Значение по умолчанию
+            
+        if self.midfielders:
+            self.midfield = sum(player.overall for player in self.midfielders) // len(self.midfielders)
+        else:
+            self.midfield = 50  # Значение по умолчанию
+            
+        # Общий рейтинг команды
+        self.overall = (self.attack + self.defence + self.midfield) // 3
 
     def set_squad(self):
         [num_attackers, num_midfielders, num_defenders] = self.manager.formation
-        squad_attackers = []
-        squad_midfielders = []
-        squad_defenders = []
-
+        
+        # Выбор стартового состава на основе рейтинга игроков
         self.attackers.sort(key=lambda x: x.overall, reverse=True)
-        for player in self.attackers[0:num_attackers]:
-            player.set_as_starter()
-            squad_attackers.append(player)
-
         self.midfielders.sort(key=lambda x: x.overall, reverse=True)
-        for player in self.midfielders[0:num_midfielders]:
-            player.set_as_starter()
-            squad_midfielders.append(player)
-
         self.defenders.sort(key=lambda x: x.overall, reverse=True)
-        for player in self.defenders[0:num_defenders]:
-            player.set_as_starter()
-            squad_defenders.append(player)
-
         self.goalkeepers.sort(key=lambda x: x.overall, reverse=True)
-        player = self.goalkeepers[0]
-        player.set_as_starter()
-        squad_gk = [player]
+        
+        squad_attackers = self.attackers[:num_attackers]
+        squad_midfielders = self.midfielders[:num_midfielders]
+        squad_defenders = self.defenders[:num_defenders]
+        squad_gk = self.goalkeepers[:1]  # только один вратарь
+        
+        # Помечаем игроков как стартовых
+        for player in squad_attackers + squad_midfielders + squad_defenders + squad_gk:
+            player.set_as_starter()
+            
         self.squad = {
             "attackers": squad_attackers,
-            "midfielders": squad_attackers,
+            "midfielders": squad_midfielders,
             "defenders": squad_defenders,
             "goalkeeper": squad_gk,
         }

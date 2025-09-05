@@ -3,8 +3,7 @@ from tabulate import tabulate
 
 from simulator.match import Match
 from simulator.team import Team
-import simulator.configs.league as scl
-
+from simulator.data_provider import DataProvider
 
 class League:
     LEAGUE_TABLE_ATTRIBUTES = [
@@ -19,12 +18,13 @@ class League:
         "GD",
     ]
 
-    def __init__(self, option):
+    def __init__(self):
         self.week = 0
-        self.name = scl.leagues[scl.countries[option]]["name"]
+        self.data_provider = DataProvider()
+        self.name = self.data_provider.get_league_name()
         self.players = {}
         self.teams = {}
-        self.team_names = scl.leagues[scl.countries[option]]["teams"]
+        self.team_names = self.data_provider.get_all_teams()
         self.set_teams()
         self.set_players()
         self.schedule = self.create_balanced_round_robin(self.team_names)
@@ -58,7 +58,7 @@ class League:
 
             schedule.append(round_schedule)
 
-            teams.insert(1, teams.pop())  # Rotate the list
+            teams.insert(1, teams.pop())
 
         return schedule
 
@@ -75,9 +75,8 @@ class League:
         return table
 
     def show_league_table(self):
-        print(
-            tabulate(self.standings, headers=self.standings.columns, tablefmt="github")
-        )
+        print(f"\n{self.name} - Current Standings:")
+        print(tabulate(self.standings, headers=self.standings.columns, tablefmt="github"))
 
     def update_league_table(self, match):
         (result, winner, loser) = match.evaluate_match_result()
@@ -85,6 +84,7 @@ class League:
         num_winner_goals = match.stats[winner]["Goal"]
         num_loser_goals = match.stats[loser]["Goal"]
         goal_difference = num_winner_goals - num_loser_goals
+        
         if result == "Draw":
             for team in [winner, loser]:
                 table.loc[(table["Club"] == team.name)] += [
@@ -121,22 +121,31 @@ class League:
                 num_winner_goals,
                 -goal_difference,
             ]
-        table.sort_values(by="Points", inplace=True, ascending=False)
+        
+        table.sort_values(by=["Points", "GD", "GF"], 
+                         inplace=True, 
+                         ascending=[False, False, False])
         table.reset_index(drop=True, inplace=True)
 
     def simulate_match(self, home_team_name, away_team_name):
         home_team = self.teams[home_team_name]
         away_team = self.teams[away_team_name]
         match = Match(home_team, away_team)
-        match.show_match_result()
+        match.simulate()
         self.update_league_table(match)
 
     def simulate_week(self):
+        print(f"\nSimulating Week {self.week + 1}:")
         for home_team, away_team in self.schedule[self.week]:
-            self.simulate_match(home_team, away_team)
+            if home_team and away_team:  # Пропускаем None (если есть)
+                print(f"  {home_team} vs {away_team}")
+                self.simulate_match(home_team, away_team)
         self.week += 1
 
     def simulate_league(self):
+        print(f"Starting {self.name} simulation with {len(self.team_names)} teams...")
         while self.week < len(self.schedule):
             self.simulate_week()
             self.show_league_table()
+        
+        print(f"\n{self.name} simulation completed!")
